@@ -1,5 +1,4 @@
-const currentDate = new Date()
-const CURRENT_TIME = currentDate.getTime()
+const CURRENT_TIME = new Date().getTime()
 const ONE_MONTH_IN_MILISECONDS = 2628000000
 
 const tablehead = document.querySelector('#tablehead')
@@ -49,7 +48,7 @@ async function getData() {
     }
 }
 
-//calculation then chart
+//calculation then put on chart
 async function backTest() {
     let data = await getData()
     let pricesData = data.prices
