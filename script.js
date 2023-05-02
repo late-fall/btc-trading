@@ -1,6 +1,5 @@
 const currentDate = new Date()
 const CURRENT_TIME = currentDate.getTime()
-const ONE_YEAR_IN_MILISECONDS = 31536000000
 const ONE_MONTH_IN_MILISECONDS = 2628000000
 
 const tablehead = document.querySelector('#tablehead')
@@ -10,7 +9,7 @@ const enterprice = document.querySelector('#enterprice')
 const backtestBtn = document.querySelector('#backtestBtn')
 const currentprice = document.querySelector('#currentprice')
 
-//customizable
+//customizable inputs
 let START_TIME = 0 //1492825757 //April 22 2014
 let MULTIPLIER = 2
 let initialAmt = 1000
@@ -35,6 +34,7 @@ function formatNum(n) {
     return Number(Number(n.toFixed(2))).toLocaleString("en-US")
 }
 
+//Using coingecko API to get bitcoin historical price data.
 async function getData() {
     let url = 'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?'
     try {
@@ -49,6 +49,7 @@ async function getData() {
     }
 }
 
+//calculation then chart
 async function backTest() {
     let data = await getData()
     let pricesData = data.prices
