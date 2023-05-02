@@ -8,6 +8,7 @@ const pricetable = document.querySelector('#pricetable')
 const result = document.querySelector('#finalresult')
 const enterprice = document.querySelector('#enterprice')
 const backtestBtn = document.querySelector('#backtestBtn')
+const currentprice = document.querySelector('#currentprice')
 
 //customizable
 let START_TIME = 0 //1492825757 //April 22 2014
@@ -16,6 +17,9 @@ let initialAmt = 1000
 let selltiming = 12
 let startdate = ''
 let enddate = ''
+
+let buyDates = []
+let sellDates = []
 
 function convertTime(UNIX_timestamp) {
     let d = new Date(UNIX_timestamp);
@@ -45,38 +49,41 @@ async function getData() {
     }
 }
 
-async function getPrice() {
+async function backTest() {
     let data = await getData()
     let pricesData = data.prices
     
     let low = pricesData[0][1]
-    let longPosition = false
+    let longPosition
     let buyPrice = 0
     let buyDate = START_TIME
-    let profit = 0
     let profitPercent = 0
     let total = initialAmt
+    let bought = false
 
-    tablehead.innerHTML = '<tr> <th scope="col">Date</th scope="col">'
-                            + '<th scope="col">Price</th scope="col">'
-                            + '<th scope="col">Buy/Sell</th scope="col">'
-                            + '<th scope="col">Profit/Loss $</th scope="col">'
-                            + '<th scope="col">Profit/Loss %</th scope="col"></tr>'
+    let prices = []
+    let dates = []
+
+    tablehead.innerHTML = '<tr> <th class="w-1/4" scope="col">Date</th scope="col">'
+                            + '<th class="w-1/4" scope="col">Price</th scope="col">'
+                            + '<th class="w-1/6" scope="col">Buy/Sell</th scope="col">'
+                            + '<th class="w-1/4" scope="col">Profit/Loss %</th scope="col"></tr>'
 
     for (let i = 0; i < pricesData.length; i++){
-        // pricetable.innerHTML += "<tr><td>" + convertTime(pricesData[i][0]) + "</td><td>" + pricesData[i][1] + "</td></tr>" //display all data
         let price = pricesData[i][1]
         let date = pricesData[i][0]
-        if (date > enddate){break}
-        if (date < startdate){continue}
         if (!longPosition) {
             if (price >= low * MULTIPLIER){
                 longPosition = true
                 buyPrice = price
                 buyDate = date
-                pricetable.innerHTML += '<tr>'
-                + `<td>${convertTime(date)}</td><td>${formatNum(price)}</td><td>Buy</td><td></td><td></td>`
-                + '</tr>'
+                if (date >= startdate && date < enddate){
+                    pricetable.innerHTML += '<tr>'
+                    + `<td>${convertTime(date)}</td><td>${formatNum(price)}</td><td>Buy</td><td></td><td></td>`
+                    + '</tr>'
+                    buyDates.push(convertTime(date))
+                    bought = true
+                }
             }
             else {
                 if (price < low){ low = price }
@@ -86,18 +93,29 @@ async function getPrice() {
             if (date == buyDate + ONE_MONTH_IN_MILISECONDS * selltiming){
                 longPosition = false
                 low = price
-                profit = formatNum(price - buyPrice)
-                profitPercent = formatNum((price - buyPrice)/buyPrice * 100)
-                pricetable.innerHTML += '<tr>'
-                + `<td>${convertTime(date)}</td><td>${formatNum(price)}</td><td>Sell</td><td>${profit}</td><td>${profitPercent}</td>`
-                + '</tr>'
-                total = total * (profitPercent / 100 + 1)
+                if (date >= startdate && date < enddate && bought){
+                    profit = formatNum(price - buyPrice)
+                    profitPercent = formatNum((price - buyPrice)/buyPrice * 100)
+                    pricetable.innerHTML += '<tr>'
+                    + `<td>${convertTime(date)}</td><td>${formatNum(price)}</td><td>Sell</td><td>${profitPercent} %</td>`
+                    + '</tr>'
+                    total = total * (profitPercent / 100 + 1)
+                    sellDates.push(convertTime(date))
+                    bought = false
+                }
             }
         }
+        if (date >= startdate && date < enddate){
+            prices.push(price)
+            dates.push(convertTime(date))
+        }
     }    
-    totalPercent = formatNum((total - initialAmt)/initialAmt)
-    finalresult.innerHTML += `Total amount as of ${convertTime(CURRENT_TIME)} is $${formatNum(total)} which is ${totalPercent * 100}% when you start with $${formatNum(Number(initialAmt))}.`
-    enterprice.innerHTML = `Enter long position when bitcoin is over $${formatNum(low * MULTIPLIER)}.`
+    totalPercent = (total - initialAmt)/initialAmt
+    finalresult.innerHTML += `Total amount as of ${convertTime(CURRENT_TIME)} is $${formatNum(Number(total))} which is ${formatNum(totalPercent * 100)}% when you start with $${formatNum(Number(initialAmt))}.`
+    enterprice.innerHTML = `Enter long position when bitcoin price ($USD) is over <strong>$${formatNum(low * MULTIPLIER)}.</strong>`
+    currentprice.innerHTML = `Current bitcoin is <strong>$${formatNum(pricesData.at(-1)[1])}.</strong>`
+
+    chartData(prices, dates)
 }
 
 //backtest Btn
@@ -115,5 +133,130 @@ backtestBtn.addEventListener('click', function() {
     enddate = document.querySelector('#enddate').value
     startdate = new Date(startdate).getTime()
     enddate = new Date(enddate).getTime()
-    getPrice()
+    backTest()
 })
+
+//chart function
+async function chartData(prices, dates){
+    const ctx = document.getElementById('myChart');
+
+    let chartInstance = Chart.getChart("myChart")
+    if (chartInstance != undefined){
+        chartInstance.destroy()
+    }
+
+    let total = 0
+    let count = 0
+    let buyIndex = []
+    let sellIndex = []
+    
+    //get index of buyDates 
+    for (let i = 0; i <dates.length; i ++){
+        if (buyDates.includes(dates[i])){
+            buyIndex.push(i)
+        }
+        else if (sellDates.includes(dates[i])){
+            sellIndex.push(i)
+        }
+    }
+
+    prices.forEach((item) => {
+        total += item
+        count++
+    })
+
+    let avg = total/count
+    let difUp = Math.max.apply(null, prices) - avg
+
+    let myChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: dates,
+        datasets: [{
+        label: 'BTC/USD price ($)',
+        data: prices,
+        borderWidth: 1
+        }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                display: true,
+                labels: {
+                    color: '#ffffff',
+                    font: {
+                        size: 16,
+                        family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+                    }
+                }
+            },
+            subtitle: {
+                display: true,
+                text: '🟢 BUY         🔴 SELL',
+                position: 'bottom',
+                color: '#Ffffff'
+            },
+        },
+        elements: {
+            line: {
+                borderColor: '#Ffffff',
+                backgroundColor: 'Ffffff'
+            },
+            point: {
+                radius: function(context){
+                    let index = context.dataIndex
+                    for (let i=0; i < buyIndex.length; i++){
+                        if (index == buyIndex[i]) {
+                            return 7
+                        }
+                    }
+                    for (let i=0; i < sellIndex.length; i++){
+                        if (index == sellIndex[i]) {
+                            return 7
+                        }
+                    }
+                    return 0
+                },
+                backgroundColor: function(context){
+                    let index = context.dataIndex
+                    for (let i=0; i < buyIndex.length; i++){
+                        if (index == buyIndex[i]) {
+                            return '#11b751'
+                        }
+                    }
+                    for (let i=0; i < sellIndex.length; i++){
+                        if (index == sellIndex[i]) {
+                            return '#F13b3b'
+                        }
+                    }
+                    return '#F1e3e3'
+                },
+                hitRadius: 10,
+                hoverRadius: function(context){
+                    let index = context.dataIndex
+                    for (let i=0; i < buyIndex.length; i++){
+                        if (index == buyIndex[i]) {
+                            return 13
+                        }
+                    }
+                    for (let i=0; i < sellIndex.length; i++){
+                        if (index == sellIndex[i]) {
+                            return 13
+                        }
+                    }
+                    return 3
+                }
+            }
+        },
+        scales: {
+            y: {
+                max: avg + difUp * 1.25,
+                min: 0
+            }
+        }
+        }
+    });
+
+}
