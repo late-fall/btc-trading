@@ -9,12 +9,14 @@ const backtestBtn = document.querySelector('#backtestBtn')
 const currentprice = document.querySelector('#currentprice')
 
 //customizable inputs
-let START_TIME = 0 //1492825757 //April 22 2014
+let START_TIME = 0 //1492825757 April 22 2014 - first price data available
 let MULTIPLIER = 2
 let initialAmt = 1000
 let selltiming = 12
 let startdate = ''
 let enddate = ''
+// set default End date to today's date.
+document.getElementById("enddate").value = new Date().toLocaleDateString();
 
 let buyDates = []
 let sellDates = []
@@ -48,7 +50,7 @@ async function getData() {
     }
 }
 
-//calculation then put on chart
+//calculate then put on chart
 async function backTest() {
     let data = await getData()
     let pricesData = data.prices
@@ -96,7 +98,7 @@ async function backTest() {
                 if (date >= startdate && date < enddate && bought){
                     profit = formatNum(price - buyPrice)
                     profitPercent = formatNum((price - buyPrice)/buyPrice * 100)
-                    pricetable.innerHTML += '<tr>'
+                    pricetable.innerHTML += '<tr style="border-bottom: 1px solid white">'
                     + `<td>${convertTime(date)}</td><td>${formatNum(price)}</td><td>Sell</td><td>${profitPercent} %</td>`
                     + '</tr>'
                     total = total * (profitPercent / 100 + 1)
@@ -111,9 +113,14 @@ async function backTest() {
         }
     }    
     totalPercent = (total - initialAmt)/initialAmt
-    finalresult.innerHTML += `Total amount as of ${convertTime(CURRENT_TIME)} is $${formatNum(Number(total))} which is ${formatNum(totalPercent * 100)}% when you start with $${formatNum(Number(initialAmt))}.`
-    enterprice.innerHTML = `Enter long position when bitcoin price ($USD) is over <strong>$${formatNum(low * MULTIPLIER)}.</strong>`
-    currentprice.innerHTML = `Current bitcoin is <strong>$${formatNum(pricesData.at(-1)[1])}.</strong>`
+    finalresult.innerHTML += `Total amount on ${convertTime(CURRENT_TIME)} is $ ${formatNum(Number(total))} which is ${formatNum(totalPercent * 100)} % from $ ${formatNum(Number(initialAmt))}.`
+    if (!longPosition){
+        enterprice.innerHTML = `Enter long position when bitcoin price ($USD) is over <strong>$ ${formatNum(low * MULTIPLIER)}.</strong>`
+    }
+    else{
+        enterprice.innerHTML = "You need to wait for the next cycle before entering long position."
+    }
+    currentprice.innerHTML = `Current bitcoin price is <strong>$ ${formatNum(pricesData.at(-1)[1])}</strong> (USD).`
 
     chartData(prices, dates)
 }
